@@ -1,11 +1,14 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { handleCommand } from './bot.js';
+import axios from 'axios';
 import * as qrcode from 'qrcode';
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
+const SIGNAL_API_URL = process.env.SIGNAL_API_URL;
+const BOT_NUMBER = process.env.BOT_NUMBER;
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -20,14 +23,16 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(PORT, () => {
-  console.log(`✅ Server listening on port ${PORT}`);
-});
-
-app.get('/', async (req, res) => {
-  const qrText = 'https://signal.org/linkdevice/#your-real-signal-cli-link'; // 這裡請換成真實 Signal QR 內容
+app.get('/qr', async (req, res) => {
   try {
+    const response = await axios.post(`${SIGNAL_API_URL}/v2/link`, {
+      deviceName: 'Signal Bot Web',
+      number: BOT_NUMBER
+    });
+
+    const qrText = response.data.qr;
     const qrDataUrl = await qrcode.toDataURL(qrText);
+
     res.send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -50,4 +55,8 @@ app.get('/', async (req, res) => {
     console.error("QR code error", error);
     res.status(500).send("❌ 無法產生 QR Code");
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Server listening on port ${PORT}`);
 });
