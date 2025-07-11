@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { handleCommand } from './bot.js';
-import qrcode from 'qrcode';
+import * as qrcode from 'qrcode';
 
 dotenv.config();
 const app = express();
@@ -25,21 +25,29 @@ app.listen(PORT, () => {
 });
 
 app.get('/', async (req, res) => {
-  const qrText = 'https://signal.org/linkdevice/#your-real-code';
+  const qrText = 'https://signal.org/linkdevice/#your-real-signal-cli-link'; // 這裡請換成真實 Signal QR 內容
   try {
     const qrDataUrl = await qrcode.toDataURL(qrText);
     res.send(`
-      <html>
-        <head><title>Signal QR Code</title></head>
-        <body style="text-align:center;font-family:sans-serif;">
-          <h1>🔗 掃描 QR code 登入 Signal Bot</h1>
-          <img src="${qrDataUrl}" />
-          <p>請使用 Signal App ➜ 裝置 ➜ 加入新裝置 掃描此碼</p>
-        </body>
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <title>Signal Bot QR Code</title>
+        <style>
+          body { font-family: sans-serif; text-align: center; margin-top: 100px; }
+          img { width: 300px; height: 300px; }
+        </style>
+      </head>
+      <body>
+        <h1>🔗 掃描 QR code 登入 Signal Bot</h1>
+        <img src="${qrDataUrl}" alt="QR Code" />
+        <p>請使用 Signal App ➜ 裝置 ➜ 加入新裝置 掃描此碼</p>
+      </body>
       </html>
     `);
-  } catch (e) {
-    console.error("QR code error", e);
-    res.status(500).send("QR code error");
+  } catch (error) {
+    console.error("QR code error", error);
+    res.status(500).send("❌ 無法產生 QR Code");
   }
 });
