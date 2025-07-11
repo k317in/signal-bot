@@ -1,77 +1,61 @@
-const fs = require("fs");
-const path = require("path");
-const { google } = require("googleapis");
+import { google } from 'googleapis';
+import dotenv from 'dotenv';
 
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets"];
-const spreadsheetId = process.env.SHEET_ID;
+dotenv.config();
+const SHEET_ID = process.env.SHEET_ID;
 
-// 若環境內無 credentials.json，從環境變數建立
-const credsPath = path.join(__dirname, "google-credentials.json");
-if (!fs.existsSync(credsPath)) {
-  const base64 = process.env.GOOGLE_CREDENTIALS_BASE64;
-  fs.writeFileSync(credsPath, Buffer.from(base64, "base64"));
+function getClient() {
+  const credentials = JSON.parse(
+    Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString()
+  );
+  const auth = new google.auth.JWT(
+    credentials.client_email,
+    null,
+    credentials.private_key,
+    ['https://www.googleapis.com/auth/spreadsheets']
+  );
+  return google.sheets({ version: 'v4', auth });
 }
 
-const keys = require(credsPath);
-
-const auth = new google.auth.GoogleAuth({
-  credentials: keys,
-  scopes: SCOPES,
-});
-
-const sheets = google.sheets({ version: "v4", auth });
-
-async function getRows(sheetName) {
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetName}!A2:F`,
+export async function getRows(day) {
+  const client = getClient();
+  const res = await client.spreadsheets.values.get({
+    spreadsheetId: SHEET_ID,
+    range: `${day}!A2:B`
   });
   return res.data.values || [];
 }
 
-async function appendRow(sheetName, row) {
-  await sheets.spreadsheets.values.append({
-    spreadsheetId,
-    range: `${sheetName}!A:F`,
-    valueInputOption: "USER_ENTERED",
-    resource: { values: [row] },
+export async function appendRow(day, name, status) {
+  const client = getClient();
+  await client.spreadsheets.values.append({
+    spreadsheetId: SHEET_ID,
+    range: `${day}!A2:B`,
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [[name, status]]
+    }
   });
 }
 
-async function updatePayment(sheetName, name, paid, paidBy, paidTime) {
-  const rows = await getRows(sheetName);
-  const index = rows.findIndex((r) => r[0].toLowerCase() === name.toLowerCase());
-  if (index === -1) return false;
-
-  const range = `${sheetName}!D${index + 2}:F${index + 2}`;
-  const values = paid ? [["✅", paidBy, paidTime]] : [["", "", ""]];
-  await sheets.spreadsheets.values.update({
-    spreadsheetId,
-    range,
-    valueInputOption: "USER_ENTERED",
-    resource: { values },
-  });
-  return true;
+export async function updatePaidStatus(day, name, status) {
+  const client = getClient();
+  const rows = await getRows(day);
+  const index = rows.findIndex(row => row[0] === name);
+  if (index !== -1) {
+    const range = `${day}!B${index + 2}`;
+    await client.spreadsheets.values.update({
+      spreadsheetId: SHEET_ID,
+      range,
+      valueInputOption: 'USER_ENTERED',
+      requestBody: {
+        values: [[status]]
+      }
+    });
+  }
 }
 
-async function removeRow(sheetName, name) {
-  const rows = await getRows(sheetName);
-  const index = rows.findIndex((r) => r[0].toLowerCase() === name.toLowerCase());
-  if (index === -1) return false;
-
-  const requests = [{
-    deleteDimension: {
-      range: {
-        sheetId: sheetName === "Tuesday" ? 0 : 1,
-        dimension: "ROWS",
-        startIndex: index + 1,
-        endIndex: index + 2,
-      },
-    },
-  }];
-
-  await sheets.spreadsheets.batchUpdate({ spreadsheetId, resource: { requests } });
-  return true;
+export async function getUnpaidList(day) {
+  const rows = await getRows(day);
+  return rows.filter(r => r[1] !== 'paid').map(r => r[0]);
 }
-
-module.exports = { getRows, appendRow, updatePayment, removeRow };
