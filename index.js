@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import { handleCommand } from './bot.js';
+import qrcode from 'qrcode';
 
 dotenv.config();
 const app = express();
@@ -21,4 +22,16 @@ app.post('/webhook', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
+});
+
+app.get('/qrcode.png', async (req, res) => {
+  try {
+    const qrText = `https://signal.org/linkdevice/#replace-with-real-signal-cli-link`;
+    const qrImage = await qrcode.toBuffer(qrText);
+    res.type('png');
+    res.send(qrImage);
+  } catch (error) {
+    console.error('QR code generation failed:', error);
+    res.sendStatus(500);
+  }
 });
