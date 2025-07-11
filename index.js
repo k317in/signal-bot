@@ -24,14 +24,22 @@ app.listen(PORT, () => {
   console.log(`✅ Server listening on port ${PORT}`);
 });
 
-app.get('/qrcode.png', async (req, res) => {
+app.get('/', async (req, res) => {
+  const qrText = 'https://signal.org/linkdevice/#your-real-code';
   try {
-    const qrText = `https://signal.org/linkdevice/#replace-with-real-signal-cli-link`;
-    const qrImage = await qrcode.toBuffer(qrText);
-    res.type('png');
-    res.send(qrImage);
-  } catch (error) {
-    console.error('QR code generation failed:', error);
-    res.sendStatus(500);
+    const qrDataUrl = await qrcode.toDataURL(qrText);
+    res.send(`
+      <html>
+        <head><title>Signal QR Code</title></head>
+        <body style="text-align:center;font-family:sans-serif;">
+          <h1>🔗 掃描 QR code 登入 Signal Bot</h1>
+          <img src="${qrDataUrl}" />
+          <p>請使用 Signal App ➜ 裝置 ➜ 加入新裝置 掃描此碼</p>
+        </body>
+      </html>
+    `);
+  } catch (e) {
+    console.error("QR code error", e);
+    res.status(500).send("QR code error");
   }
 });
